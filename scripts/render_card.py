@@ -108,7 +108,7 @@ def draw_shadow_card(draw, x, y, w, h):
     draw.rounded_rectangle([x, y, x + w, y + h], radius=20, outline=COLORS["card_border"], width=1)
 
 
-def render_card(weather, trending, ai_news, domestic_news, quote, output_path: Path):
+def render_card(weather, trending, producthunt, ai_news, domestic_news, quote, output_path: Path):
     today = datetime.now(_tz)
     month_day = f"{today.month}月{today.day}日"
     date_str = today.strftime("%Y年%m月%d日")
@@ -314,6 +314,9 @@ def render_card(weather, trending, ai_news, domestic_news, quote, output_path: P
     # ── Sections ──
     y = section_header("—— GitHub Trending ——", y)
     y = draw_items(trending, y, show_trans=True)
+
+    y = section_header("—— ProductHunt ——", y)
+    y = draw_items(producthunt, y, show_trans=True)
 
     y = section_header("—— AI 科技动态 ——", y)
     y = draw_items(ai_news, y)

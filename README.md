@@ -41,7 +41,8 @@
 |------|------|
 | 多城市天气 | Open-Meteo 免费 API，WMO 天气代码配 PIL 手绘图标，支持 N 天预报 |
 | GitHub Trending | 网页抓取 + MyMemory 中文翻译，语言/星标标签，Top N 可配置 |
-| AI 科技动态 | 多源融合：RSS（TechCrunch、The Verge）+ Hacker News API + 36氪，描述优先 |
+| ProductHunt | Atom Feed 解析，产品标语 + 作者标签，每日热门新品 |
+| AI 科技动态 | 多源融合：RSS（TechCrunch、The Verge）+ Hacker News API + AI前线 + 36氪，描述优先 |
 | 国内热点 | 新华社、人民网逐篇文章抓取，meta description + 首段兜底提取正文 |
 | 每日名言 | ZenQuotes API 每日动态获取，失败自动回退到 ~20 条静态精选库 |
 | PIL 卡片渲染 | 纯 Python，零浏览器依赖，动态高度裁剪，暖色调完整色板 |
@@ -85,9 +86,11 @@ Skill 自带 `requests` + `BeautifulSoup` 抓取器，Agent 无需 web-search AP
 | 来源 | 方式 | 类型 |
 |------|------|------|
 | GitHub Trending | 网页抓取 | 开发 |
+| ProductHunt | Atom Feed 解析 | 英文产品 |
 | TechCrunch | RSS 订阅 | 英文科技 |
 | The Verge | RSS 订阅 | 英文科技 |
 | Hacker News | Firebase API | 英文科技 |
+| AI前线 | 网页抓取（163.com媒体页） | 中文AI科技 |
 | 36氪 | 网页抓取（meta description） | 中文科技 |
 | 新华社 | 文章页抓取 | 国内新闻 |
 | 人民网 | 文章页抓取（GB2312） | 国内新闻 |
@@ -240,7 +243,7 @@ pip install -r ~/.claude/skills/daily-news-briefing/requirements.txt
 
 ### Prerequisites & News Sources
 
-**Out of the box** — built-in HTTP scrapers work without Agent-side web tools (no API key or CDP browser needed): GitHub Trending, TechCrunch, The Verge, Hacker News, 36kr, Xinhuanet, People's Daily.
+**Out of the box** — built-in HTTP scrapers work without Agent-side web tools (no API key or CDP browser needed): GitHub Trending, ProductHunt, TechCrunch, The Verge, Hacker News, AI前线, 36kr, Xinhuanet, People's Daily.
 
 **Extending** — for sites blocked by WAF or JS rendering (e.g. huxiu), pre-fill `output/data/news_input.json` using your Agent's web-search or CDP browser, then run `python scripts/generate.py`. The skill reads this file first and only supplements what's missing. See [SKILL.md](SKILL.md#extending-news-sources).
 
@@ -250,7 +253,8 @@ pip install -r ~/.claude/skills/daily-news-briefing/requirements.txt
 |-----------|-------------|
 | Multi-city Weather | Open-Meteo API, WMO codes with PIL-drawn icons, configurable days |
 | GitHub Trending | Web scraping + Chinese translation, language/stars tags |
-| AI/Tech News | Multi-source: RSS + Hacker News API + Chinese tech sites |
+| ProductHunt | Atom feed parsing, tagline + maker tags |
+| AI/Tech News | Multi-source: RSS + Hacker News API + AI前线 + 36kr |
 | Domestic News | Xinhuanet & People's Daily article scraping |
 | Daily Quote | ZenQuotes API with static fallback |
 | PIL Rendering | Pure Python, no browser, dynamic height, warm palette |

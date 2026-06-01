@@ -66,16 +66,28 @@ GITHUB_TRENDING = {
 }
 
 # ═══════════════════════════════════════════════════════════
+# ProductHunt
+# ═══════════════════════════════════════════════════════════
+
+PRODUCTHUNT = {
+    "display_count": 10,
+    "feed_url": "https://www.producthunt.com/feed",
+    "request_timeout": 15,
+    "user_agent": "Mozilla/5.0",
+}
+
+# ═══════════════════════════════════════════════════════════
 # AI 科技动态
 # ═══════════════════════════════════════════════════════════
 
 AI_NEWS = {
     "display_count": 10,
     "sources": [
-        {"name": "36氪",    "url": "https://36kr.com"},
-        {"name": "Hacker News",  "url": "https://news.ycombinator.com"},
-        {"name": "TechCrunch",   "url": "https://techcrunch.com"},
-        {"name": "The Verge",    "url": "https://theverge.com"},
+        {"name": "AI前线",      "url": "https://www.163.com/dy/media/T1708928867206.html", "priority": 1},
+        {"name": "Hacker News", "url": "https://news.ycombinator.com", "priority": 2},
+        {"name": "TechCrunch",  "url": "https://techcrunch.com", "priority": 3},
+        {"name": "The Verge",   "url": "https://theverge.com", "priority": 4},
+        {"name": "36氪",        "url": "https://36kr.com", "priority": 5},
     ],
 }
 
@@ -88,6 +100,7 @@ DOMESTIC_NEWS = {
     "sources": [
         {"name": "新华社",   "url": "https://xinhuanet.com"},
         {"name": "人民日报", "url": "https://people.cn"},
+        {"name": "AI前线",   "url": "https://www.163.com/dy/media/T1708928867206.html"},
     ],
 }
 

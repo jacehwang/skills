@@ -14,7 +14,8 @@ Generates a warm-toned card-style PNG image containing:
 
 - Multi-city weather forecast (Open-Meteo API, no key required)
 - GitHub Trending repositories (web scraping)
-- AI/Tech news (RSS feeds, Hacker News API, Chinese tech sites)
+- ProductHunt trending products (Atom feed)
+- AI/Tech news (RSS feeds, Hacker News API, AI前线, 36kr)
 - Domestic China news (xinhuanet, people.cn)
 - Daily inspirational quote (ZenQuotes API with static fallback)
 
@@ -41,6 +42,7 @@ Edit `config/settings.py` to customize behavior. Key sections:
 |---------|-------------------|
 | `WEATHER` | Cities (lat/lon/timezone), forecast days |
 | `GITHUB_TRENDING` | Display count, scrape URL |
+| `PRODUCTHUNT` | Display count, feed URL |
 | `AI_NEWS` | Display count, news sources |
 | `DOMESTIC_NEWS` | Display count, news sources |
 | `CARD` | Card width, margins, padding |
@@ -60,9 +62,11 @@ The skill includes HTTP-based scrapers that work without any Agent-side web capa
 | Source | Method | Language |
 |--------|--------|----------|
 | GitHub Trending | `requests` + BeautifulSoup | EN → CN (MyMemory) |
+| ProductHunt | Atom feed via `xml.etree` | EN |
 | TechCrunch | RSS feed via `xml.etree` | EN |
 | The Verge | RSS feed via `xml.etree` | EN |
 | Hacker News | Firebase REST API | EN |
+| AI前线 | 163.com media page scraping | CN |
 | 36kr | Article page scraping (meta description) | CN |
 | Xinhuanet | Article page scraping | CN |
 | People's Daily | Article page scraping (GB2312) | CN |
@@ -78,6 +82,9 @@ Some Chinese tech sites use WAF/CAPTCHA or JS rendering and cannot be scraped wi
 ```json
 {
   "github_trending": [],
+  "producthunt": [
+    {"name": "...", "description": "...", "url": "...", "maker": "..."}
+  ],
   "ai_news": [
     {"title": "...", "description": "...", "url": "..."}
   ],
@@ -130,8 +137,9 @@ The generation pipeline:
 1. Fetch weather for all configured cities (Open-Meteo)
 2. Load news from `output/data/news_input.json` if available
 3. Supplement insufficient items from live sources:
-   - GitHub: scrape trending page
-   - AI: RSS feeds + Hacker News API + Chinese tech sites
+    - GitHub: scrape trending page
+    - ProductHunt: parse Atom feed
+    - AI: RSS feeds + Hacker News API + AI前线 + 36kr
    - Domestic: xinhuanet + people.cn article scraping
 4. Fetch daily quote (ZenQuotes API → static fallback)
 5. Generate Markdown, HTML, and PIL-rendered PNG card

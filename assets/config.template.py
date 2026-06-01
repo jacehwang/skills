@@ -40,6 +40,14 @@ GITHUB_TRENDING = {
     "user_agent": "Mozilla/5.0",
 }
 
+# ProductHunt
+PRODUCTHUNT = {
+    "display_count": 10,
+    "feed_url": "https://www.producthunt.com/feed",
+    "request_timeout": 15,
+    "user_agent": "Mozilla/5.0",
+}
+
 # AI News
 AI_NEWS = {
     "display_count": 10,

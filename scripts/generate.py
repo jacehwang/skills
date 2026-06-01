@@ -27,7 +27,7 @@ from scripts.render_card import render_card as pil_render_card
 # Import config
 from config import (
     PROJECT_DIR, DATA_DIR, DAILY_DIR, IMAGES_DIR, SUMMARY_FILE, NEWS_INPUT_FILE,
-    WEATHER, WEATHER_CODE_MAP, GITHUB_TRENDING, AI_NEWS, DOMESTIC_NEWS,
+    WEATHER, WEATHER_CODE_MAP, GITHUB_TRENDING, PRODUCTHUNT, AI_NEWS, DOMESTIC_NEWS,
     COLORS, QUOTES, QUOTE_API, BEIJING_TZ,
 )
 
@@ -151,6 +151,44 @@ def _translate_to_cn(text: str) -> str:
     return ""
 
 
+def _contains_chinese(text: str) -> bool:
+    for ch in text:
+        if '\u4e00' <= ch <= '\u9fff':
+            return True
+    return False
+
+
+def _translate_ai_news(ai_news: list):
+    """Translate English descriptions in AI news items to Simplified Chinese.
+    Skips items that already have Chinese descriptions. Also normalizes whitespace."""
+    import re
+    translated = 0
+    for item in ai_news:
+        desc = item.get("description", "")
+        if not desc:
+            continue
+
+        score_suffix = ""
+        match = re.search(r'\s*\|\s*Score:\s*\d+.*$', desc)
+        if match:
+            score_suffix = desc[match.start():]
+            desc = desc[:match.start()].strip()
+
+        if _contains_chinese(desc):
+            item["description"] = re.sub(r'\s+', ' ', desc).strip() + score_suffix
+            continue
+
+        if desc and len(desc) >= 10:
+            cn = _translate_to_cn(desc)
+            if cn:
+                cn = re.sub(r'\s+', ' ', cn).strip()
+                item["description"] = cn + score_suffix
+                translated += 1
+
+    if translated:
+        print(f"   🌐 Translated {translated} AI news descriptions to Chinese")
+
+
 def _write_translation_backlog(trending: list) -> bool:
     """Write untranslated GitHub descriptions to a backlog file for Agent translation.
 
@@ -245,17 +283,110 @@ def fetch_github_trending() -> list:
     return repos[:max_items]
 
 
+# ── ProductHunt ──────────────────────────────────────────
+
+def fetch_producthunt() -> list:
+    """Scrape ProductHunt Atom feed for trending products."""
+    import xml.etree.ElementTree as ET
+    from bs4 import BeautifulSoup
+
+    headers = {
+        "User-Agent": PRODUCTHUNT["user_agent"],
+        "Accept": "application/atom+xml,application/xml",
+    }
+    products = []
+    max_items = PRODUCTHUNT["display_count"]
+
+    try:
+        resp = requests.get(
+            PRODUCTHUNT["feed_url"],
+            headers=headers,
+            timeout=PRODUCTHUNT["request_timeout"],
+        )
+        resp.raise_for_status()
+        root = ET.fromstring(resp.content)
+
+        ns = {"atom": "http://www.w3.org/2005/Atom"}
+        entries = root.findall("atom:entry", ns)
+        if not entries:
+            entries = root.findall("entry")
+
+        for entry in entries:
+            if len(products) >= max_items:
+                break
+
+            title_el = entry.find("atom:title", ns)
+            if title_el is None:
+                title_el = entry.find("title")
+            link_el = entry.find("atom:link", ns)
+            if link_el is None:
+                link_el = entry.find("link")
+            content_el = entry.find("atom:content", ns)
+            if content_el is None:
+                content_el = entry.find("content")
+            author_el = entry.find("atom:author", ns)
+            if author_el is None:
+                author_el = entry.find("author")
+
+            name = title_el.text.strip() if title_el is not None and title_el.text else ""
+
+            url = ""
+            if link_el is not None:
+                url = link_el.get("href", "")
+                if not url and link_el.text:
+                    url = link_el.text.strip()
+
+            tagline = ""
+            if content_el is not None and content_el.text:
+                soup = BeautifulSoup(content_el.text, "html.parser")
+                first_p = soup.find("p")
+                if first_p:
+                    tagline = first_p.get_text(strip=True)
+
+            maker = ""
+            if author_el is not None:
+                name_el = author_el.find("atom:name", ns)
+                if name_el is None:
+                    name_el = author_el.find("name")
+                if name_el is not None and name_el.text:
+                    maker = name_el.text.strip()
+
+            if name:
+                products.append({
+                    "name": name,
+                    "url": url,
+                    "description": tagline,
+                    "description_cn": _translate_to_cn(tagline) if tagline else "",
+                    "maker": maker,
+                })
+
+    except Exception as e:
+        print(f"      ProductHunt: {e}")
+
+    return products[:max_items]
+
+
 # ── AI News Live Scraping ─────────────────────────────────
 
 def _scrape_hacker_news(count: int) -> list:
-    """Fetch top stories from Hacker News Firebase API."""
+    """Fetch top stories from Hacker News Firebase API.
+    Only include items with a meaningful description extracted from the linked article."""
+    import re
+    import html as html_mod
+    from bs4 import BeautifulSoup
+
     items = []
+    skipped = 0
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        "Accept": "text/html,application/xhtml+xml",
+    }
     try:
         resp = requests.get(
             "https://hacker-news.firebaseio.com/v0/topstories.json", timeout=10
         )
         resp.raise_for_status()
-        ids = resp.json()[: min(count * 3, 30)]
+        ids = resp.json()[: min(count * 5, 50)]
         for item_id in ids:
             if len(items) >= count:
                 break
@@ -266,25 +397,70 @@ def _scrape_hacker_news(count: int) -> list:
                 ).json()
                 title = detail.get("title", "")
                 url = detail.get("url", "")
-                if not url or url.startswith("item?"):
+                is_self_post = not url or url.startswith("item?")
+                if is_self_post:
                     url = f"https://news.ycombinator.com/item?id={item_id}"
                 score = detail.get("score", 0)
                 descendants = detail.get("descendants", 0)
-                desc_parts = []
+
+                desc = ""
+                if not is_self_post:
+                    try:
+                        article_resp = requests.get(url, headers=headers, timeout=8)
+                        text = article_resp.text[:30000]
+
+                        match = re.search(
+                            r'<meta[^>]*name="description"[^>]*content="([^"]+)"',
+                            text,
+                        )
+                        if match:
+                            raw_desc = html_mod.unescape(match.group(1).strip())
+                            raw_desc = re.sub(r'\s*[-|–—]\s*$', '', raw_desc)
+                            if raw_desc and len(raw_desc) > 20:
+                                desc = raw_desc
+
+                        if not desc:
+                            match = re.search(
+                                r'<meta[^>]*property="og:description"[^>]*content="([^"]+)"',
+                                text,
+                            )
+                            if match:
+                                raw_desc = html_mod.unescape(match.group(1).strip())
+                                if raw_desc and len(raw_desc) > 20:
+                                    desc = raw_desc
+
+                        if not desc:
+                            soup = BeautifulSoup(text, "html.parser")
+                            for p in soup.find_all("p"):
+                                ptext = p.get_text(strip=True)
+                                if len(ptext) > 40:
+                                    desc = ptext
+                                    break
+                    except Exception:
+                        pass
+
+                if not desc:
+                    skipped += 1
+                    continue
+
+                desc_parts = [desc[:200]]
                 if score:
                     desc_parts.append(f"Score: {score}")
                 if descendants:
                     desc_parts.append(f"Comments: {descendants}")
+
                 if title:
                     items.append({
                         "title": title,
-                        "description": " | ".join(desc_parts) if desc_parts else "",
+                        "description": " | ".join(desc_parts),
                         "url": url,
                     })
             except Exception:
                 continue
     except Exception as e:
         print(f"      HN API: {e}")
+    if skipped:
+        print(f"      HN skipped {skipped} items without description")
     return items
 
 
@@ -329,7 +505,7 @@ def _scrape_rss_feeds(count: int) -> list:
 
 
 def _scrape_cn_tech(count: int) -> list:
-    """Scrape Chinese tech news sites with descriptions.
+    """Scrape Chinese tech news sites with descriptions: 36kr.
 
     Only sources that work with plain HTTP requests are included.
     Sites requiring JS rendering or blocked by WAF are excluded —
@@ -390,28 +566,138 @@ def _scrape_cn_tech(count: int) -> list:
     return items
 
 
+def _scrape_ai_frontline(count: int) -> list:
+    """Scrape AI前线 articles from 163.com media page.
+    AI前线 is a top Chinese AI tech media focusing on overseas frontier,
+    AI engineering, and model applications. Content is already in Chinese."""
+    import re
+    import html as html_mod
+    from bs4 import BeautifulSoup
+
+    items = []
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        "Accept": "text/html,application/xhtml+xml",
+    }
+
+    try:
+        resp = requests.get(
+            "https://www.163.com/dy/media/T1708928867206.html",
+            headers=headers, timeout=10
+        )
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+
+        raw_items = []
+        seen = set()
+        for a in soup.select("a[href*='/dy/article/']"):
+            title = a.get_text(strip=True)
+            href = a.get("href", "")
+            if title and len(title) > 10 and title not in seen:
+                seen.add(title)
+                url = href if href.startswith("http") else "https://www.163.com" + href
+                raw_items.append({"title": title, "url": url})
+                if len(raw_items) >= count * 3:
+                    break
+
+        for item in raw_items:
+            if len(items) >= count:
+                break
+            desc = ""
+            try:
+                ar = requests.get(item["url"], headers=headers, timeout=8)
+                text = ar.text[:80000]
+
+                # Meta description on 163.com articles is often keyword spam.
+                # Only use it if it looks like a real sentence, not comma-separated tags.
+                match = re.search(
+                    r'<meta[^>]*name="description"[^>]*content="([^"]+)"',
+                    text,
+                )
+                if match:
+                    raw_desc = html_mod.unescape(match.group(1).strip())
+                    raw_desc = re.sub(r'\s*[-|–—]\s*$', '', raw_desc)
+                    if raw_desc and len(raw_desc) > 30:
+                        commas = raw_desc.count(",")
+                        chars = len(raw_desc)
+                        if commas == 0 or chars / max(commas, 1) > 15:
+                            desc = raw_desc
+
+                if not desc:
+                    match = re.search(
+                        r'<meta[^>]*property="og:description"[^>]*content="([^"]+)"',
+                        text,
+                    )
+                    if match:
+                        raw_desc = html_mod.unescape(match.group(1).strip())
+                        if raw_desc and len(raw_desc) > 30:
+                            commas = raw_desc.count(",")
+                            chars = len(raw_desc)
+                            if commas == 0 or chars / max(commas, 1) > 15:
+                                desc = raw_desc
+
+                if not desc:
+                    soup_article = BeautifulSoup(text, "html.parser")
+                    for p in soup_article.find_all("p"):
+                        ptext = p.get_text(strip=True)
+                        if len(ptext) > 60 and "整理" not in ptext[:10] and "作者" not in ptext[:10]:
+                            desc = ptext
+                            break
+            except Exception:
+                pass
+
+            if desc:
+                items.append({
+                    "title": item["title"],
+                    "description": desc[:200],
+                    "url": item["url"],
+                })
+    except Exception as e:
+        print(f"      AI前线 media page: {e}")
+
+    return items
+
+
 def fetch_ai_news_live(count: int) -> list:
     """Live-fetch AI/tech news from multiple sources to supplement JSON data.
-    Distributes across sources for diverse, high-quality items with descriptions."""
+    Sources are called in priority order defined in config AI_NEWS.sources."""
+    from config.settings import AI_NEWS
+
     all_items = []
-    per_source = max(3, count // 3)  # Take ~1/3 from each source type
+    per_source = max(2, count // 4)
 
-    # Source 1: RSS feeds first (best descriptions)
-    rss = _scrape_rss_feeds(per_source)
-    all_items.extend(rss)
-    print(f"      RSS feeds: {len(rss)} items")
+    sources_sorted = sorted(AI_NEWS["sources"], key=lambda s: s.get("priority", 99))
+    scraper_map = {
+        "AI前线": _scrape_ai_frontline,
+        "Hacker News": _scrape_hacker_news,
+        "36氪": _scrape_cn_tech,
+    }
+    rss_called = False
 
-    # Source 2: Hacker News (popularity signals)
+    for source in sources_sorted:
+        if len(all_items) >= count:
+            break
+        name = source["name"]
+
+        if name in ("TechCrunch", "The Verge"):
+            if not rss_called:
+                items = _scrape_rss_feeds(per_source)
+                all_items.extend(items)
+                print(f"      RSS feeds: {len(items)} items")
+                rss_called = True
+            continue
+
+        scraper = scraper_map.get(name)
+        if scraper:
+            items = scraper(per_source)
+            all_items.extend(items)
+            print(f"      {name}: {len(items)} items")
+
     if len(all_items) < count:
-        hn = _scrape_hacker_news(per_source)
-        all_items.extend(hn)
-        print(f"      Hacker News: {len(hn)} items")
-
-    # Source 3: Chinese tech sites
-    if len(all_items) < count:
-        cn = _scrape_cn_tech(count - len(all_items))
-        all_items.extend(cn)
-        print(f"      Chinese tech: {len(cn)} items")
+        remaining = count - len(all_items)
+        more_rss = _scrape_rss_feeds(remaining)
+        all_items.extend(more_rss)
+        print(f"      RSS extra: {len(more_rss)} items")
 
     return all_items[:count]
 
@@ -579,7 +865,7 @@ def fetch_domestic_news_live(count: int) -> list:
 
 
 # ── Markdown Generation ─────────────────────────────────
-def generate_markdown(weather: dict, trending: list, ai_news: list, domestic_news: list, quote: tuple) -> str:
+def generate_markdown(weather: dict, trending: list, producthunt: list, ai_news: list, domestic_news: list, quote: tuple) -> str:
     """Generate the daily briefing Markdown file."""
     today = datetime.now(_tz)
     filename_date = today.strftime("%Y-%m-%d")
@@ -609,6 +895,19 @@ def generate_markdown(weather: dict, trending: list, ai_news: list, domestic_new
         stars_tag = f" | {repo['stars_today']}" if repo['stars_today'] else ""
         md += f"{desc}{lang_tag}{stars_tag}\n\n"
         md += f"[查看项目]({repo['url']})\n\n"
+    md += "\n"
+
+    # ── ProductHunt ──
+    md += "---\n\n"
+    md += "## —— ProductHunt ——\n\n"
+    for i, product in enumerate(producthunt, 1):
+        num = f"{i:02d}"
+        md += f"### {num}. {product['name']}\n\n"
+        desc = product.get('description_cn') or product.get('description') or "(暂无描述)"
+        maker_tag = f" by {product['maker']}" if product.get('maker') else ""
+        md += f"{desc}{maker_tag}\n\n"
+        if product.get('url'):
+            md += f"[查看产品]({product['url']})\n\n"
     md += "\n"
 
     # ── AI News ──
@@ -642,7 +941,7 @@ def generate_markdown(weather: dict, trending: list, ai_news: list, domestic_new
 
 # ── HTML Generation (Warm Card Style) ───────────────────
 def generate_html(md_content: str, month_day: str, weather: dict, trending: list,
-                  ai_news: list, domestic_news: list, quote: tuple) -> str:
+                  producthunt: list, ai_news: list, domestic_news: list, quote: tuple) -> str:
     """Convert the briefing to a warm-toned HTML card."""
 
     # Build weather line (multi-city)
@@ -672,6 +971,19 @@ def generate_html(md_content: str, month_day: str, weather: dict, trending: list
             <div class="item-title">{num}. {repo['name']}{lang_tag}{stars_tag}</div>
             <div class="item-desc">{desc}</div>
             <a class="item-link" href="{repo['url']}">{repo['url']}</a>
+        </div>"""
+
+    # Build ProductHunt items
+    ph_html = ""
+    for i, product in enumerate(producthunt, 1):
+        num = f"{i:02d}"
+        desc = product.get('description_cn') or product.get('description') or "(暂无描述)"
+        maker_tag = f' by <span class="maker-tag">{product["maker"]}</span>' if product.get("maker") else ""
+        ph_html += f"""
+        <div class="item">
+            <div class="item-title">{num}. {product['name']}{maker_tag}</div>
+            <div class="item-desc">{desc}</div>
+            {f'<a class="item-link" href="{product["url"]}">查看产品 →</a>' if product.get('url') else ''}
         </div>"""
 
     # Build AI news items
@@ -871,6 +1183,12 @@ body {{
         {trending_html}
     </div>
 
+    <!-- ProductHunt -->
+    <div class="section">
+        <div class="section-header">—— ProductHunt ——</div>
+        {ph_html}
+    </div>
+
     <!-- AI News -->
     <div class="section">
         <div class="section-header">—— AI 科技动态 ——</div>
@@ -956,6 +1274,7 @@ def main():
     ai_news = []
     domestic_news = []
     trending = []
+    producthunt = []
 
     if NEWS_INPUT_FILE.exists():
         try:
@@ -963,11 +1282,13 @@ def main():
             ai_news = news_data.get("ai_news", [])
             domestic_news = news_data.get("domestic_news", [])
             trending = news_data.get("github_trending", [])
+            producthunt = news_data.get("producthunt", [])
         except Exception as e:
             print(f"   ⚠️  Failed to parse news input: {e}")
 
     # 3. Ensure data meets config display_count — supplement if needed
     need_gh = GITHUB_TRENDING["display_count"]
+    need_ph = PRODUCTHUNT["display_count"]
     need_ai = AI_NEWS["display_count"]
     need_dm = DOMESTIC_NEWS["display_count"]
 
@@ -986,6 +1307,23 @@ def main():
                 if len(trending) >= need_gh:
                     break
             print(f"   ✅ GitHub Trending now: {len(trending)} repos")
+        except Exception as e:
+            print(f"   ⚠️  Scraping failed: {e}")
+
+    # ProductHunt: scrape live if JSON is insufficient
+    if len(producthunt) < need_ph:
+        short = need_ph - len(producthunt)
+        print(f"   ⚠️  ProductHunt only {len(producthunt)} items (need {need_ph}), scraping {short} more...")
+        try:
+            scraped = fetch_producthunt()
+            existing_names = {r["name"] for r in producthunt}
+            for r in scraped:
+                if r["name"] not in existing_names:
+                    producthunt.append(r)
+                    existing_names.add(r["name"])
+                if len(producthunt) >= need_ph:
+                    break
+            print(f"   ✅ ProductHunt now: {len(producthunt)} products")
         except Exception as e:
             print(f"   ⚠️  Scraping failed: {e}")
 
@@ -1025,10 +1363,14 @@ def main():
 
     # Apply display_count limits
     trending = trending[:need_gh]
+    producthunt = producthunt[:need_ph]
     ai_news = ai_news[:need_ai]
     domestic_news = domestic_news[:need_dm]
 
-    print(f"   ✅ AI: {len(ai_news)} items, Domestic: {len(domestic_news)} items, GitHub: {len(trending)} repos")
+    print(f"   ✅ AI: {len(ai_news)} items, Domestic: {len(domestic_news)} items, GitHub: {len(trending)} repos, ProductHunt: {len(producthunt)} products")
+
+    # Translate English AI news descriptions to Chinese
+    _translate_ai_news(ai_news)
 
     # Apply Agent translations from previous run (if any)
     _apply_translation_backlog(trending)
@@ -1040,13 +1382,14 @@ def main():
         domestic_news = [{"title": "（待采集）", "description": "每日国内热点将通过外部 Agent 自动采集"}]
 
     # Save collected news data for reference (dated file for traceability)
-    if trending or ai_news or domestic_news:
+    if trending or ai_news or domestic_news or producthunt:
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         today_str = datetime.now(_tz).strftime("%Y-%m-%d")
         dated_news_file = DATA_DIR / f"news_input_{today_str}.json"
         dated_news_file.write_text(
             json.dumps({
                 "github_trending": trending,
+                "producthunt": producthunt,
                 "ai_news": ai_news,
                 "domestic_news": domestic_news,
             }, ensure_ascii=False, indent=2),
@@ -1065,7 +1408,7 @@ def main():
     # 5. Generate Markdown
     print("\n📝  Generating Markdown...")
     md_content, filename_date, month_day = generate_markdown(
-        weather, trending, ai_news, domestic_news, quote
+        weather, trending, producthunt, ai_news, domestic_news, quote
     )
 
     md_path = DAILY_DIR / f"{filename_date}.md"
@@ -1074,7 +1417,7 @@ def main():
 
     # 6. Generate HTML
     print("\n🎨  Generating warm-toned HTML card...")
-    html_content = generate_html(md_content, month_day, weather, trending, ai_news, domestic_news, quote)
+    html_content = generate_html(md_content, month_day, weather, trending, producthunt, ai_news, domestic_news, quote)
 
     html_path = DAILY_DIR / f"{filename_date}.html"
     html_path.write_text(html_content, encoding="utf-8")
@@ -1086,7 +1429,7 @@ def main():
 
     print("\n🎨  Rendering card image...")
     try:
-        pil_render_card(weather, trending, ai_news, domestic_news, quote, img_path)
+        pil_render_card(weather, trending, producthunt, ai_news, domestic_news, quote, img_path)
         img_ok = img_path.exists()
         if img_ok:
             print(f"   ✅ Image saved: {img_path}")
