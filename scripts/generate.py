@@ -880,7 +880,9 @@ def generate_markdown(weather: dict, trending: list, producthunt: list, ai_news:
     for city_data in weather["cities"]:
         md += f"## 🌤 {city_data['name']}天气\n\n"
         for d in city_data["days"]:
-            t_range = f"{int(round(d['temp_min']))}°C ~ {int(round(d['temp_max']))}°C"
+            t_min = d['temp_min'] if isinstance(d['temp_min'], str) else int(round(d['temp_min']))
+            t_max = d['temp_max'] if isinstance(d['temp_max'], str) else int(round(d['temp_max']))
+            t_range = f"{t_min}°C ~ {t_max}°C"
             md += f"- **{d['label']}**（{d['date']}）：{d['weather']}，{t_range}\n"
         md += "\n"
 
@@ -949,7 +951,9 @@ def generate_html(md_content: str, month_day: str, weather: dict, trending: list
     for city_data in weather["cities"]:
         city_lines = []
         for d in city_data["days"]:
-            t_range = f"{int(round(d['temp_min']))}°C ~ {int(round(d['temp_max']))}°C"
+            t_min = d['temp_min'] if isinstance(d['temp_min'], str) else int(round(d['temp_min']))
+            t_max = d['temp_max'] if isinstance(d['temp_max'], str) else int(round(d['temp_max']))
+            t_range = f"{t_min}°C ~ {t_max}°C"
             city_lines.append(
                 f'<span class="weather-item"><strong>{d["label"]}</strong> {d["weather"]} {t_range}</span>'
             )
