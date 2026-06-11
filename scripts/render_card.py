@@ -261,7 +261,12 @@ def render_card(weather, trending, producthunt, ai_news, domestic_news, quote, o
         day_segs = []
         for di, d in enumerate(days):
             date_label = d.get("date_display", d.get("date", d["label"]))
-            t = f"{int(round(d['temp_min']))}~{int(round(d['temp_max']))}°C"
+            t_min = d.get('temp_min', '--')
+            t_max = d.get('temp_max', '--')
+            if isinstance(t_min, (int, float)) and isinstance(t_max, (int, float)):
+                t = f"{int(round(t_min))}~{int(round(t_max))}°C"
+            else:
+                t = f"{t_min}~{t_max}°C"
             day_segs.append((d["weather_code"], f"{date_label} {t}"))
 
         # Layout days into lines
