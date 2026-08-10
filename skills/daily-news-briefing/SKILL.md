@@ -149,7 +149,7 @@ The generation pipeline:
 
 ## Font Cross-Platform Support
 
-This skill bundles Noto Sans SC (SIL Open Font License) in `assets/fonts/` for cross-platform Chinese text rendering. On macOS, system STHeiti fonts are tried first. On other platforms, the bundled Noto Sans SC fonts are used automatically.
+This skill bundles Noto Sans CJK SC under the SIL Open Font License in `assets/fonts/` for cross-platform Chinese text rendering; see `assets/fonts/LICENSE.txt`. On macOS, system STHeiti fonts are tried first. On other platforms, the bundled fonts are used automatically.
 
 ## References
 
