@@ -1,0 +1,4 @@
+interface:
+  display_name: "Frontend UI Visual Gate"
+  short_description: "Preview UI directions before frontend development"
+  default_prompt: "Use $frontend-ui-visual-gate for any frontend UI change, including small CSS or responsive adjustments, before implementation."
