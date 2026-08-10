@@ -9,8 +9,10 @@ Image rendering: PIL (no browser dependency).
 
 import json
 import html
+import ipaddress
 import os
 import random
+import re
 import sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -191,6 +193,26 @@ def _translate_ai_news(ai_news: list):
         print(f"   🌐 Translated {translated} AI news descriptions to Chinese")
 
 
+def _normalize_backlog_entry(entry):
+    if not isinstance(entry, dict):
+        return None
+    name = entry.get("name")
+    text = entry.get("text")
+    if not isinstance(name, str) or not name.strip():
+        return None
+    if not isinstance(text, str) or not text.strip():
+        return None
+    normalized = {
+        "index": entry.get("index") if isinstance(entry.get("index"), int) else 0,
+        "name": name.strip(),
+        "text": text.strip(),
+    }
+    cn = entry.get("cn")
+    if isinstance(cn, str) and cn.strip():
+        normalized["cn"] = cn.strip()
+    return normalized
+
+
 def _write_translation_backlog(trending: list) -> bool:
     """Write untranslated GitHub descriptions to a backlog file for Agent translation.
 
@@ -216,7 +238,10 @@ def _write_translation_backlog(trending: list) -> bool:
 
     merged = []
     seen = set()
-    for entry in existing + untranslated:
+    for raw_entry in existing + untranslated:
+        entry = _normalize_backlog_entry(raw_entry)
+        if entry is None:
+            continue
         key = (entry.get("name"), entry.get("text"))
         if key not in seen:
             seen.add(key)
@@ -239,11 +264,15 @@ def _apply_translation_backlog(trending: list):
     if not backlog_file.exists():
         return
     try:
-        backlog = json.loads(backlog_file.read_text(encoding="utf-8"))
+        loaded = json.loads(backlog_file.read_text(encoding="utf-8"))
+        backlog = loaded if isinstance(loaded, list) else []
         repos_by_name = {repo.get("name"): repo for repo in trending if repo.get("name")}
         applied = 0
         remaining = []
-        for entry in backlog:
+        for raw_entry in backlog:
+            entry = _normalize_backlog_entry(raw_entry)
+            if entry is None:
+                continue
             repo = repos_by_name.get(entry.get("name"))
             cn = entry.get("cn", "").strip()
             source_text = entry.get("text", "").strip()
@@ -977,8 +1006,28 @@ def _html_text(value) -> str:
     return html.escape(str(value), quote=True)
 
 
+def _valid_hostname(hostname: str) -> bool:
+    try:
+        ipaddress.ip_address(hostname)
+        return True
+    except ValueError:
+        pass
+
+    try:
+        ascii_hostname = hostname.rstrip(".").encode("idna").decode("ascii")
+    except UnicodeError:
+        return False
+    if not ascii_hostname or len(ascii_hostname) > 253 or "%" in ascii_hostname:
+        return False
+    labels = ascii_hostname.split(".")
+    label_pattern = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?")
+    return all(label_pattern.fullmatch(label) for label in labels)
+
+
 def _safe_http_url(value) -> str:
-    url = str(value or "").strip()
+    url = str(value or "")
+    if url != url.strip():
+        return ""
     if not url or any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in url):
         return ""
     try:
@@ -987,7 +1036,12 @@ def _safe_http_url(value) -> str:
         parsed.port
     except ValueError:
         return ""
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc or not hostname:
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.netloc
+        or not hostname
+        or not _valid_hostname(hostname)
+    ):
         return ""
     return url
 
