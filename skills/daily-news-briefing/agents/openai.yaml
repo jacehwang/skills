@@ -1,0 +1,4 @@
+interface:
+  display_name: "Daily News Briefing"
+  short_description: "Generate a visual daily digest from weather and news sources"
+  default_prompt: "Use $daily-news-briefing to generate today's news briefing card."
