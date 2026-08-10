@@ -1,8 +1,10 @@
 import json
+import io
 import sys
 import tempfile
 import unittest
 from contextlib import ExitStack
+from contextlib import redirect_stdout
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
@@ -66,6 +68,24 @@ class GenerateHtmlTests(unittest.TestCase):
             html,
         )
 
+    def test_rejects_malformed_http_urls_without_raising(self):
+        malformed = [
+            "https://exa mple.com/path",
+            "https://example.com/path\nheader",
+            "https://[::1",
+            "https://example.com:invalid/path",
+            "https://:80/path",
+            "javascript:alert(1)",
+        ]
+
+        for url in malformed:
+            with self.subTest(url=url):
+                try:
+                    result = generate._safe_http_url(url)
+                except ValueError as exc:
+                    self.fail(f"malformed URL raised ValueError: {exc}")
+                self.assertEqual(result, "")
+
 
 class TranslationBacklogTests(unittest.TestCase):
     def test_matches_by_repository_name_and_preserves_unmatched_entries(self):
@@ -81,13 +101,35 @@ class TranslationBacklogTests(unittest.TestCase):
                 {"name": "alpha", "description": "Alpha"},
             ]
 
-            with patch.object(generate, "DATA_DIR", data_dir):
+            with patch.object(generate, "DATA_DIR", data_dir), redirect_stdout(io.StringIO()):
                 generate._apply_translation_backlog(trending)
 
             self.assertNotIn("description_cn", trending[0])
             self.assertEqual(trending[1]["description_cn"], "甲")
             remaining = json.loads(backlog_path.read_text(encoding="utf-8"))
             self.assertEqual([entry["name"] for entry in remaining], ["missing"])
+
+    def test_main_flow_merge_keeps_stale_and_new_backlog_entries(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir)
+            backlog_path = data_dir / "translate_backlog.json"
+            backlog_path.write_text(json.dumps([
+                {"index": 0, "name": "alpha", "text": "Alpha", "cn": "甲"},
+                {"index": 1, "name": "stale", "text": "Stale", "cn": "旧译文"},
+            ]), encoding="utf-8")
+            trending = [
+                {"name": "beta", "description": "Beta"},
+                {"name": "alpha", "description": "Alpha"},
+            ]
+
+            with patch.object(generate, "DATA_DIR", data_dir), redirect_stdout(io.StringIO()):
+                generate._apply_translation_backlog(trending)
+                generate._write_translation_backlog(trending)
+
+            remaining = json.loads(backlog_path.read_text(encoding="utf-8"))
+            by_name = {entry["name"]: entry for entry in remaining}
+            self.assertEqual(set(by_name), {"beta", "stale"})
+            self.assertEqual(by_name["stale"]["cn"], "旧译文")
 
 
 class XinhuanetTests(unittest.TestCase):
@@ -132,7 +174,7 @@ class SummaryTests(unittest.TestCase):
 
 
 class MainTests(unittest.TestCase):
-    def test_render_failure_makes_generation_fail(self):
+    def _run_main_with_renderer(self, renderer):
         weather = {"cities": []}
         with tempfile.TemporaryDirectory() as temp_dir, ExitStack() as stack:
             root = Path(temp_dir)
@@ -157,11 +199,40 @@ class MainTests(unittest.TestCase):
             stack.enter_context(patch.object(
                 generate,
                 "pil_render_card",
-                side_effect=RuntimeError("render failed"),
+                side_effect=renderer,
             ))
 
-            with self.assertRaisesRegex(RuntimeError, "render failed"):
-                generate.main()
+            output = io.StringIO()
+            with redirect_stdout(output):
+                try:
+                    generate.main()
+                except Exception as exc:
+                    return exc, output.getvalue()
+            return None, output.getvalue()
+
+    def test_render_failure_makes_generation_fail(self):
+        error, output = self._run_main_with_renderer(RuntimeError("render failed"))
+
+        self.assertIsInstance(error, RuntimeError)
+        self.assertEqual(str(error), "render failed")
+        self.assertNotIn("Generation Complete!", output)
+
+    def test_missing_rendered_image_makes_generation_fail(self):
+        error, output = self._run_main_with_renderer(lambda *_args: None)
+
+        self.assertIsInstance(error, RuntimeError)
+        self.assertIn("did not create a readable file", str(error))
+        self.assertNotIn("Generation Complete!", output)
+
+    def test_empty_rendered_image_makes_generation_fail(self):
+        def create_empty_image(*args):
+            Path(args[-1]).touch()
+
+        error, output = self._run_main_with_renderer(create_empty_image)
+
+        self.assertIsInstance(error, RuntimeError)
+        self.assertIn("did not create a readable file", str(error))
+        self.assertNotIn("Generation Complete!", output)
 
 
 if __name__ == "__main__":

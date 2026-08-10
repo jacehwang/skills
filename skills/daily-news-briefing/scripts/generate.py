@@ -205,8 +205,24 @@ def _write_translation_backlog(trending: list) -> bool:
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     backlog_file = DATA_DIR / "translate_backlog.json"
+    existing = []
+    if backlog_file.exists():
+        try:
+            loaded = json.loads(backlog_file.read_text(encoding="utf-8"))
+            if isinstance(loaded, list):
+                existing = loaded
+        except (OSError, json.JSONDecodeError):
+            pass
+
+    merged = []
+    seen = set()
+    for entry in existing + untranslated:
+        key = (entry.get("name"), entry.get("text"))
+        if key not in seen:
+            seen.add(key)
+            merged.append(entry)
     backlog_file.write_text(
-        json.dumps(untranslated, ensure_ascii=False, indent=2),
+        json.dumps(merged, ensure_ascii=False, indent=2),
         encoding="utf-8"
     )
     print(f"\n  ⚠️  {len(untranslated)} GitHub descriptions untranslated (MyMemory quota exhausted)")
@@ -963,8 +979,17 @@ def _html_text(value) -> str:
 
 def _safe_http_url(value) -> str:
     url = str(value or "").strip()
-    parsed = urlsplit(url)
-    return url if parsed.scheme in {"http", "https"} and parsed.netloc else ""
+    if not url or any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in url):
+        return ""
+    try:
+        parsed = urlsplit(url)
+        hostname = parsed.hostname
+        parsed.port
+    except ValueError:
+        return ""
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc or not hostname:
+        return ""
+    return url
 
 
 def generate_html(md_content: str, month_day: str, weather: dict, trending: list,
