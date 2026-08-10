@@ -237,15 +237,17 @@ def _write_translation_backlog(trending: list) -> bool:
             pass
 
     merged = []
-    seen = set()
+    positions = {}
     for raw_entry in existing + untranslated:
         entry = _normalize_backlog_entry(raw_entry)
         if entry is None:
             continue
         key = (entry.get("name"), entry.get("text"))
-        if key not in seen:
-            seen.add(key)
+        if key not in positions:
+            positions[key] = len(merged)
             merged.append(entry)
+        elif entry.get("cn") and not merged[positions[key]].get("cn"):
+            merged[positions[key]]["cn"] = entry["cn"]
     backlog_file.write_text(
         json.dumps(merged, ensure_ascii=False, indent=2),
         encoding="utf-8"
@@ -1013,8 +1015,11 @@ def _valid_hostname(hostname: str) -> bool:
     except ValueError:
         pass
 
+    if hostname.endswith(".."):
+        return False
+    dns_hostname = hostname[:-1] if hostname.endswith(".") else hostname
     try:
-        ascii_hostname = hostname.rstrip(".").encode("idna").decode("ascii")
+        ascii_hostname = dns_hostname.encode("idna").decode("ascii")
     except UnicodeError:
         return False
     if not ascii_hostname or len(ascii_hostname) > 253 or "%" in ascii_hostname:
@@ -1035,6 +1040,21 @@ def _safe_http_url(value) -> str:
         hostname = parsed.hostname
         parsed.port
     except ValueError:
+        return ""
+    authority = parsed.netloc.rsplit("@", 1)[-1]
+    port_text = None
+    if authority.startswith("["):
+        closing_bracket = authority.find("]")
+        suffix = authority[closing_bracket + 1:] if closing_bracket >= 0 else ""
+        if suffix:
+            if not suffix.startswith(":"):
+                return ""
+            port_text = suffix[1:]
+    elif ":" in authority:
+        port_text = authority.rsplit(":", 1)[1]
+    if port_text is not None and (
+        not port_text or any(char < "0" or char > "9" for char in port_text)
+    ):
         return ""
     if (
         parsed.scheme not in {"http", "https"}

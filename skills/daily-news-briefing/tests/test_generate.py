@@ -76,10 +76,13 @@ class GenerateHtmlTests(unittest.TestCase):
             "https://example.com/path\nheader",
             "https://%20/path",
             "https://example..com/path",
+            "https://example.com../path",
+            "https://example.com.../path",
             "https://-example.com/path",
             "https://example-.com/path",
             "https://[::1",
             "https://example.com:invalid/path",
+            "https://example.com:+1/path",
             "https://example.com:99999/path",
             "https://:80/path",
             "javascript:alert(1)",
@@ -92,6 +95,21 @@ class GenerateHtmlTests(unittest.TestCase):
                 except ValueError as exc:
                     self.fail(f"malformed URL raised ValueError: {exc}")
                 self.assertEqual(result, "")
+
+    def test_accepts_valid_http_ip_idna_and_port_urls(self):
+        valid = [
+            "http://example.com/path",
+            "https://example.com./path",
+            "https://example.com:443/path",
+            "https://127.0.0.1:8080/path",
+            "https://[::1]:8080/path",
+            "https://例子.测试/path",
+            "https://xn--fsqu00a.xn--0zwm56d/path",
+        ]
+
+        for url in valid:
+            with self.subTest(url=url):
+                self.assertEqual(generate._safe_http_url(url), url)
 
 
 class TranslationBacklogTests(unittest.TestCase):
@@ -163,6 +181,24 @@ class TranslationBacklogTests(unittest.TestCase):
             by_name = {entry["name"]: entry for entry in remaining}
             self.assertEqual(set(by_name), {"beta", "stale"})
             self.assertEqual(by_name["stale"]["cn"], "旧译文")
+
+    def test_main_flow_prefers_translation_from_later_duplicate(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir)
+            backlog_path = data_dir / "translate_backlog.json"
+            backlog_path.write_text(json.dumps([
+                {"name": "stale", "text": "Stale"},
+                {"name": "stale", "text": "Stale", "cn": "保留译文"},
+            ]), encoding="utf-8")
+            trending = [{"name": "beta", "description": "Beta"}]
+
+            with patch.object(generate, "DATA_DIR", data_dir), redirect_stdout(io.StringIO()):
+                generate._apply_translation_backlog(trending)
+                generate._write_translation_backlog(trending)
+
+            remaining = json.loads(backlog_path.read_text(encoding="utf-8"))
+            by_name = {entry["name"]: entry for entry in remaining}
+            self.assertEqual(by_name["stale"]["cn"], "保留译文")
 
 
 class XinhuanetTests(unittest.TestCase):
