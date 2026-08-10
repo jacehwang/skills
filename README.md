@@ -1,72 +1,75 @@
-# Codex Skills
+# Skills
 
-Personal monorepo for JaceHwang's Codex skills, skill-development projects, and Codex-related plugins.
+JaceHwang's canonical monorepo for reusable Codex and Agent Skills.
 
 [English](#english) | [中文](#中文)
 
 ## English
 
-### What's here
+This repository contains exactly four directly installable Skills. Each package is self-contained under `skills/<name>` and follows the current Codex Skill structure.
 
-| Location | Contents | Origin |
+### Included Skills
+
+| Skill | Purpose | Typical triggers |
 | --- | --- | --- |
-| [`skills/`](./skills) | Standalone, directly installable Codex skills | Local custom skills |
-| [`projects/tracking-project-progress/`](./projects/tracking-project-progress) | Skill-development project with tests, hooks, and documentation | `JaceHwang/tracking-project-progress` |
-| [`plugins/codex-usage-sidebar/`](./plugins/codex-usage-sidebar) | Full Codex Usage Sidebar source; its plugin package is nested at [`plugins/codex-usage-sidebar/plugins/codex-usage-sidebar/`](./plugins/codex-usage-sidebar/plugins/codex-usage-sidebar) | `JaceHwang/codex-usage-sidebar` |
+| [`tracking-project-progress`](./skills/tracking-project-progress) | Maintain a durable project board for multi-step coding work, interruptions, resumes, and handoffs. | Feature implementation, bug fixes, refactors, migrations, project resume, handoff |
+| [`frontend-ui-visual-gate`](./skills/frontend-ui-visual-gate) | Confirm whether to generate visual mockups and align on a selected direction before frontend implementation. | New or changed pages, components, layouts, responsive behavior, interaction states, visual styling |
+| [`notion-worklog`](./skills/notion-worklog) | Capture freeform work notes in Notion and turn them into weekly or monthly leader-facing reports. | Work notes, meeting notes, weekly reports, monthly reports, work summaries |
+| [`daily-news-briefing`](./skills/daily-news-briefing) | Generate a warm-toned PNG news briefing with weather, GitHub trends, AI/tech news, domestic news, and a quote. | Daily digest, morning briefing, news summary card |
 
-### Standalone skills
+### Install
 
-- [`frontend-ui-visual-gate`](./skills/frontend-ui-visual-gate): align visual direction with the user before frontend UI architecture or implementation.
-- [`grill-me`](./skills/grill-me): interview a plan or decision until its assumptions and dependencies are explicit.
-- [`hatch-pet`](./skills/hatch-pet): create and validate Codex-compatible animated pets and spritesheets.
-- [`notion-worklog`](./skills/notion-worklog): capture work notes in Notion and create weekly or monthly reports.
-- [`tracking-project-progress`](./projects/tracking-project-progress/skills/tracking-project-progress): maintain a durable project board for non-trivial coding work.
-
-### Install a skill in Codex
-
-Copy the desired skill directory into Codex's default skills directory:
+Clone the monorepo, then copy the desired package into Codex's personal Skill directory:
 
 ```bash
-cp -R skills/frontend-ui-visual-gate ~/.codex/skills/
+git clone https://github.com/JaceHwang/Skills.git
+mkdir -p ~/.codex/skills
+cp -R Skills/skills/tracking-project-progress ~/.codex/skills/
 ```
 
-Codex also recognizes `~/.agents/skills/` as a cross-runtime skills directory. Use the source path under `projects/tracking-project-progress/skills/` for `tracking-project-progress`.
+Replace `tracking-project-progress` with `frontend-ui-visual-gate`, `notion-worklog`, or `daily-news-briefing` to install another package. Codex also recognizes `~/.agents/skills/` as a cross-runtime Skill location.
 
-### Migration policy
+`daily-news-briefing` additionally requires Python 3.9+ and its Python dependencies:
 
-This repository centralizes owned skill work without deleting its original repositories. The two GitHub source repositories are imported as Git subtrees so their source and history remain available here. See [`MIGRATION.md`](./MIGRATION.md) for the source-to-destination map.
+```bash
+python3 -m pip install -r ~/.codex/skills/daily-news-briefing/requirements.txt
+```
+
+### Repository Policy
+
+This monorepo is the source of record for these four Skills. Their prior standalone repositories were consolidated only after source history and runtime behavior were verified. See [`MIGRATION.md`](./MIGRATION.md) for commit provenance and retained history.
 
 ## 中文
 
-这是 JaceHwang 维护的 Codex Skills 总仓库，集中保存自建 skill、skill 开发项目和 Codex 相关插件。
+这是 JaceHwang 维护的 Codex 与 Agent Skills 权威总仓库，只收录四个可直接安装的 Skill。每个包均位于 `skills/<name>`，并按照当前 Codex Skill 结构整理。
 
-### 目录说明
+### 收录的 Skills
 
-| 位置 | 内容 | 来源 |
+| Skill | 用途 | 典型触发场景 |
 | --- | --- | --- |
-| [`skills/`](./skills) | 可直接安装的独立 Codex skill | 本机自定义 skill |
-| [`projects/tracking-project-progress/`](./projects/tracking-project-progress) | 含测试、hooks 和文档的 skill 开发项目 | `JaceHwang/tracking-project-progress` |
-| [`plugins/codex-usage-sidebar/`](./plugins/codex-usage-sidebar) | 完整的 Codex Usage Sidebar 源码；其插件包位于 [`plugins/codex-usage-sidebar/plugins/codex-usage-sidebar/`](./plugins/codex-usage-sidebar/plugins/codex-usage-sidebar) | `JaceHwang/codex-usage-sidebar` |
+| [`tracking-project-progress`](./skills/tracking-project-progress) | 为多步骤开发、任务中断、恢复和交接维护持久化项目进度板。 | 功能开发、缺陷修复、重构、迁移、恢复项目、任务交接 |
+| [`frontend-ui-visual-gate`](./skills/frontend-ui-visual-gate) | 前端实现前先询问是否生成效果图，并以用户选定的视觉方向作为后续开发门禁。 | 新建或调整页面、组件、布局、响应式行为、交互状态和视觉样式 |
+| [`notion-worklog`](./skills/notion-worklog) | 将工作随手记写入 Notion，并从零散记录生成面向管理者的周报或月报。 | 工作记录、会议记录、周报、月报、工作总结 |
+| [`daily-news-briefing`](./skills/daily-news-briefing) | 生成包含天气、GitHub 趋势、AI/科技新闻、国内新闻和每日名言的暖色 PNG 简报。 | 每日新闻摘要、晨报、新闻卡片 |
 
-### 已收录 skill
+### 安装
 
-- [`frontend-ui-visual-gate`](./skills/frontend-ui-visual-gate)：在前端 UI 架构和编码前先与用户确认视觉方向。
-- [`grill-me`](./skills/grill-me)：持续追问计划或决策，明确其假设与依赖。
-- [`hatch-pet`](./skills/hatch-pet)：创建并验证兼容 Codex 的动画宠物与精灵图。
-- [`notion-worklog`](./skills/notion-worklog)：将工作随手记写入 Notion，并生成周报或月报。
-- [`tracking-project-progress`](./projects/tracking-project-progress/skills/tracking-project-progress)：为非简单编码工作维护可恢复的项目进度板。
-
-### 在 Codex 中安装
-
-将所需 skill 目录复制到 Codex 的默认目录：
+克隆总仓库，再将需要的 Skill 复制到 Codex 个人目录：
 
 ```bash
-cp -R skills/frontend-ui-visual-gate ~/.codex/skills/
+git clone https://github.com/JaceHwang/Skills.git
+mkdir -p ~/.codex/skills
+cp -R Skills/skills/tracking-project-progress ~/.codex/skills/
 ```
 
-Codex 同时识别跨运行时目录 `~/.agents/skills/`。`tracking-project-progress` 的源路径位于 `projects/tracking-project-progress/skills/`。
+将 `tracking-project-progress` 替换为 `frontend-ui-visual-gate`、`notion-worklog` 或 `daily-news-briefing`，即可安装其他包。Codex 同时识别跨运行时目录 `~/.agents/skills/`。
 
-### 迁移原则
+`daily-news-briefing` 还需要 Python 3.9+ 及其依赖：
 
-本仓库集中管理自建 skill，不删除原始仓库。两个 GitHub 源仓库通过 Git subtree 导入，以保留其源码和提交历史。完整来源映射见 [`MIGRATION.md`](./MIGRATION.md)。
-A personal monorepo for Codex skills, supporting tools, and plugins.
+```bash
+python3 -m pip install -r ~/.codex/skills/daily-news-briefing/requirements.txt
+```
+
+### 仓库原则
+
+本仓库是这四个 Skill 的唯一权威来源。旧独立仓库仅在源码历史和运行行为验证通过后才被合并并删除。提交来源和历史保留方式见 [`MIGRATION.md`](./MIGRATION.md)。
