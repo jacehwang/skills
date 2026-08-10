@@ -37,4 +37,3 @@ claude plugin validate . --strict
 ## Pull requests
 
 Describe the observed problem, the behavioral or code change, and the exact verification commands and outcomes. Keep unrelated refactors out of the same pull request.
-

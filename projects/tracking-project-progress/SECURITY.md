@@ -13,4 +13,3 @@ Include the affected version, operating system, agent runtime, reproduction step
 ## Security boundaries
 
 This project executes local Python scripts and Claude Code hooks with the permissions available to the user's agent process. It intentionally makes no network calls. Users should review Skill and hook source before installation and avoid recording secrets in `.project-board/`.
-

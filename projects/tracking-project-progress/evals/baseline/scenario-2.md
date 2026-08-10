@@ -14,4 +14,3 @@
 
 - Observed: plans to reconcile stale notes with repository evidence; plans targeted and broader verification; plans a concise handoff.
 - Missing: durable project-local board; actual structured recovery state; concrete task IDs/statuses; exact commands and outcomes; a persisted next action usable by a fresh agent.
-

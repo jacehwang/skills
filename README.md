@@ -12,7 +12,7 @@ Personal monorepo for JaceHwang's Codex skills, skill-development projects, and 
 | --- | --- | --- |
 | [`skills/`](./skills) | Standalone, directly installable Codex skills | Local custom skills |
 | [`projects/tracking-project-progress/`](./projects/tracking-project-progress) | Skill-development project with tests, hooks, and documentation | `JaceHwang/tracking-project-progress` |
-| [`plugins/codex-usage-sidebar/`](./plugins/codex-usage-sidebar) | Codex Usage Sidebar plugin and its management skill | `JaceHwang/codex-usage-sidebar` |
+| [`plugins/codex-usage-sidebar/`](./plugins/codex-usage-sidebar) | Full Codex Usage Sidebar source; its plugin package is nested at [`plugins/codex-usage-sidebar/plugins/codex-usage-sidebar/`](./plugins/codex-usage-sidebar/plugins/codex-usage-sidebar) | `JaceHwang/codex-usage-sidebar` |
 
 ### Standalone skills
 
@@ -46,7 +46,7 @@ This repository centralizes owned skill work without deleting its original repos
 | --- | --- | --- |
 | [`skills/`](./skills) | 可直接安装的独立 Codex skill | 本机自定义 skill |
 | [`projects/tracking-project-progress/`](./projects/tracking-project-progress) | 含测试、hooks 和文档的 skill 开发项目 | `JaceHwang/tracking-project-progress` |
-| [`plugins/codex-usage-sidebar/`](./plugins/codex-usage-sidebar) | Codex Usage Sidebar 插件及其管理 skill | `JaceHwang/codex-usage-sidebar` |
+| [`plugins/codex-usage-sidebar/`](./plugins/codex-usage-sidebar) | 完整的 Codex Usage Sidebar 源码；其插件包位于 [`plugins/codex-usage-sidebar/plugins/codex-usage-sidebar/`](./plugins/codex-usage-sidebar/plugins/codex-usage-sidebar) | `JaceHwang/codex-usage-sidebar` |
 
 ### 已收录 skill
 

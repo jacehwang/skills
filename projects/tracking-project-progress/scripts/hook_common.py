@@ -128,4 +128,3 @@ def is_trackable_file(root: Path, value: str | None) -> bool:
 def concise_error(result: subprocess.CompletedProcess[str]) -> str:
     message = (result.stderr or result.stdout).strip()
     return message.splitlines()[-1] if message else f"exit code {result.returncode}"
-
