@@ -1,0 +1,4 @@
+interface:
+  display_name: "Notion Worklog"
+  short_description: "Capture work notes and create weekly or monthly reports"
+  default_prompt: "Use $notion-worklog to capture this work update in Notion."
