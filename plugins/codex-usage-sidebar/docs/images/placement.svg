@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="430" viewBox="0 0 1200 430" role="img" aria-labelledby="title desc">
+  <title id="title">Fixed eight-point placement across Codex layouts</title>
+  <desc id="desc">Three Codex window layouts keep the quota control eight points before Open Location.</desc>
+  <rect width="1200" height="430" rx="28" fill="#f1f1eb"/>
+  <g font-family="Avenir Next,Helvetica Neue,sans-serif">
+    <text x="42" y="46" fill="#232720" font-size="23" font-weight="700">The anchor moves. The gap stays 8 pt.</text>
+    <g transform="translate(38 78)">
+      <text x="0" y="0" fill="#50554b" font-size="14" font-weight="700">LEFT PANE OPEN</text>
+      <rect y="18" width="350" height="280" rx="16" fill="#fff" stroke="#d4d5ce"/>
+      <rect y="18" width="350" height="44" rx="16" fill="#e9e9e4"/>
+      <path d="M0 62h350" stroke="#d4d5ce"/>
+      <rect y="62" width="116" height="236" fill="#e5e5df"/>
+      <path d="M116 62v236" stroke="#d4d5ce"/>
+      <rect x="148" y="27" width="104" height="27" rx="8" fill="#dadbd4"/>
+      <text x="163" y="45" fill="#286047" font-size="11" font-weight="700">57% | 16:08</text>
+      <path d="M256 32v17" stroke="#c18a28" stroke-width="2"/>
+      <rect x="264" y="27" width="72" height="27" rx="8" fill="#dadbd4"/>
+      <text x="274" y="45" fill="#44483f" font-size="10">Open Location</text>
+      <text x="135" y="111" fill="#373b33" font-size="14" font-weight="700">Content narrows</text>
+      <text x="135" y="136" fill="#7c8176" font-size="12">Native anchor shifts left</text>
+    </g>
+
+    <g transform="translate(425 78)">
+      <text x="0" y="0" fill="#50554b" font-size="14" font-weight="700">RIGHT PANE OPEN</text>
+      <rect y="18" width="350" height="280" rx="16" fill="#fff" stroke="#d4d5ce"/>
+      <rect y="18" width="350" height="44" rx="16" fill="#e9e9e4"/>
+      <path d="M0 62h350" stroke="#d4d5ce"/>
+      <rect x="238" y="62" width="112" height="236" fill="#e5e5df"/>
+      <path d="M238 62v236" stroke="#d4d5ce"/>
+      <rect x="42" y="27" width="104" height="27" rx="8" fill="#dadbd4"/>
+      <text x="57" y="45" fill="#286047" font-size="11" font-weight="700">57% | 16:08</text>
+      <path d="M150 32v17" stroke="#c18a28" stroke-width="2"/>
+      <rect x="158" y="27" width="72" height="27" rx="8" fill="#dadbd4"/>
+      <text x="168" y="45" fill="#44483f" font-size="10">Open Location</text>
+      <text x="30" y="111" fill="#373b33" font-size="14" font-weight="700">Header shifts farther left</text>
+      <text x="30" y="136" fill="#7c8176" font-size="12">Quota follows the same AX control</text>
+    </g>
+
+    <g transform="translate(812 78)">
+      <text x="0" y="0" fill="#50554b" font-size="14" font-weight="700">BOTTOM PANE + RESIZE</text>
+      <rect y="18" width="350" height="280" rx="16" fill="#fff" stroke="#d4d5ce"/>
+      <rect y="18" width="350" height="44" rx="16" fill="#e9e9e4"/>
+      <path d="M0 62h350" stroke="#d4d5ce"/>
+      <rect y="218" width="350" height="80" fill="#e5e5df"/>
+      <path d="M0 218h350" stroke="#d4d5ce"/>
+      <rect x="148" y="27" width="104" height="27" rx="8" fill="#dadbd4"/>
+      <text x="163" y="45" fill="#286047" font-size="11" font-weight="700">57% | 16:08</text>
+      <path d="M256 32v17" stroke="#c18a28" stroke-width="2"/>
+      <rect x="264" y="27" width="72" height="27" rx="8" fill="#dadbd4"/>
+      <text x="274" y="45" fill="#44483f" font-size="10">Open Location</text>
+      <text x="30" y="111" fill="#373b33" font-size="14" font-weight="700">Window geometry changes</text>
+      <text x="30" y="136" fill="#7c8176" font-size="12">Cached frame sampled every 0.1 s</text>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - "codex/**"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: macOS build and verification
+    runs-on: macos-26
+    timeout-minutes: 20
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.5.app/Contents/Developer
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Verify release toolchain
+        run: |
+          test "$(xcrun --sdk macosx --show-sdk-version)" = "26.5"
+          uname -m
+          xcodebuild -version
+
+      - name: Validate public repository
+        env:
+          CUS_ALLOW_SOURCE_AHEAD: ${{ github.ref != 'refs/heads/main' && '1' || '0' }}
+        run: bash scripts/validate-public-repo.sh
+
+      - name: Build and test native companion
+        working-directory: plugins/codex-usage-sidebar
+        run: bash scripts/build-companion.sh
+
+      - name: Verify companion SDK
+        working-directory: plugins/codex-usage-sidebar
+        run: bash tests/test-build-sdk.sh
+
+      - name: Verify companion bundle version
+        working-directory: plugins/codex-usage-sidebar
+        run: bash tests/test-bundle-version.sh
+
+      - name: Test install lifecycle
+        working-directory: plugins/codex-usage-sidebar
+        run: bash tests/test-sidebar-control.sh
+
+      - name: Test stable signing selection
+        working-directory: plugins/codex-usage-sidebar
+        run: bash tests/test-signing-identity.sh
+
+      - name: Validate rebuilt payload
+        run: CUS_REBUILT_PAYLOAD=1 bash scripts/validate-public-repo.sh
+
+      - name: Package exact tested payload
+        run: |
+          bash scripts/package-release.sh
+          (cd .dist && shasum -a 256 -c SHA256SUMS.txt)
+          archive="$(find .dist -maxdepth 1 -name 'codex-usage-sidebar-v*.zip' -print -quit)"
+          if unzip -Z1 "$archive" | \
+            grep -E '(^|/)(\.git|\.build|\.dist|\.swiftpm)(/|$)|\.DS_Store$|^__MACOSX/'; then
+            echo 'release archive contains generated or metadata files' >&2
+            exit 1
+          fi
+
+      - name: Upload tested release payload
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: codex-usage-sidebar-release
+          path: |
+            .dist/codex-usage-sidebar-v*.zip
+            .dist/SHA256SUMS.txt
+          include-hidden-files: true
+          if-no-files-found: error
