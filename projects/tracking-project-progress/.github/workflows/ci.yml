@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Run behavior and structure tests
+        run: python3 -m unittest discover -s tests -v
+
+      - name: Compile runtime scripts
+        run: python3 -m compileall -q scripts skills/tracking-project-progress/scripts
+
+      - name: Install Agent Skills reference validator
+        run: python3 -m pip install --disable-pip-version-check skills-ref==0.1.1
+
+      - name: Validate Agent Skill specification
+        run: agentskills validate skills/tracking-project-progress
+
+      - name: Validate JSON files
+        run: |
+          python3 -m json.tool .claude-plugin/plugin.json >/dev/null
+          python3 -m json.tool .claude-plugin/marketplace.json >/dev/null
+          python3 -m json.tool hooks/hooks.json >/dev/null

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "tracking-project-progress",
+  "displayName": "Project Progress Board",
+  "version": "0.1.0",
+  "description": "Keeps a durable, project-local development board that coding agents can resume after interruptions.",
+  "author": {
+    "name": "Byctor",
+    "url": "https://github.com/Byctor"
+  },
+  "homepage": "https://github.com/Byctor/tracking-project-progress#readme",
+  "repository": "https://github.com/Byctor/tracking-project-progress",
+  "license": "Apache-2.0",
+  "keywords": [
+    "agent-skills",
+    "claude-code",
+    "coding-agent",
+    "project-management",
+    "handoff"
+  ]
+}

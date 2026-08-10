@@ -1,0 +1,23 @@
+{
+  "name": "tracking-project-progress",
+  "owner": {
+    "name": "Byctor",
+    "url": "https://github.com/Byctor"
+  },
+  "description": "Open-source development continuity tools for coding agents",
+  "version": "0.1.0",
+  "plugins": [
+    {
+      "name": "tracking-project-progress",
+      "displayName": "Project Progress Board",
+      "source": ".",
+      "description": "Automatically creates, resumes, updates, and checkpoints a project-local coding progress board.",
+      "category": "productivity",
+      "tags": [
+        "agent-skills",
+        "development",
+        "project-management"
+      ]
+    }
+  ]
+}

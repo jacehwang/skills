@@ -1,0 +1,7 @@
+interface:
+  display_name: "Project Progress Board"
+  short_description: "Resume coding work from a durable project board"
+  default_prompt: "Use $tracking-project-progress to resume and maintain this project’s development progress board."
+
+policy:
+  allow_implicit_invocation: true
