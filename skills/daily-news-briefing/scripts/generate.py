@@ -8,11 +8,13 @@ Image rendering: PIL (no browser dependency).
 """
 
 import json
+import html
 import os
 import random
 import sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import requests
 import zoneinfo
@@ -222,16 +224,28 @@ def _apply_translation_backlog(trending: list):
         return
     try:
         backlog = json.loads(backlog_file.read_text(encoding="utf-8"))
+        repos_by_name = {repo.get("name"): repo for repo in trending if repo.get("name")}
         applied = 0
+        remaining = []
         for entry in backlog:
-            idx = entry.get("index")
+            repo = repos_by_name.get(entry.get("name"))
             cn = entry.get("cn", "").strip()
-            if idx is not None and cn and idx < len(trending):
-                trending[idx]["description_cn"] = cn
+            source_text = entry.get("text", "").strip()
+            current_text = repo.get("description", "").strip() if repo else ""
+            if repo and cn and (not source_text or source_text == current_text):
+                repo["description_cn"] = cn
                 applied += 1
+            else:
+                remaining.append(entry)
         if applied:
             print(f"   🤖 Applied {applied} Agent translations from backlog")
-            backlog_file.unlink()  # cleanup after applying
+        if remaining:
+            backlog_file.write_text(
+                json.dumps(remaining, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        else:
+            backlog_file.unlink()
     except Exception:
         pass
 
@@ -717,6 +731,7 @@ def _scrape_xinhuanet(count: int) -> list:
     # Step 1: Collect titles from listing pages
     raw_items = []
     seen = set()
+    current_year_path = f"/{datetime.now(_tz).year}"
     for url in ["https://www.news.cn/politics/", "https://www.news.cn/"]:
         if len(raw_items) >= count * 2:
             break
@@ -727,7 +742,7 @@ def _scrape_xinhuanet(count: int) -> list:
             for a in soup.select("a[href*='/']"):
                 title = a.get_text(strip=True)
                 href = a.get("href", "")
-                if title and len(title) > 10 and title not in seen and "/2026" in href:
+                if title and len(title) > 10 and title not in seen and current_year_path in href:
                     seen.add(title)
                     url_full = href if href.startswith("http") else "https://www.news.cn" + href
                     raw_items.append({"title": title, "url": url_full})
@@ -942,6 +957,16 @@ def generate_markdown(weather: dict, trending: list, producthunt: list, ai_news:
 
 
 # ── HTML Generation (Warm Card Style) ───────────────────
+def _html_text(value) -> str:
+    return html.escape(str(value), quote=True)
+
+
+def _safe_http_url(value) -> str:
+    url = str(value or "").strip()
+    parsed = urlsplit(url)
+    return url if parsed.scheme in {"http", "https"} and parsed.netloc else ""
+
+
 def generate_html(md_content: str, month_day: str, weather: dict, trending: list,
                   producthunt: list, ai_news: list, domestic_news: list, quote: tuple) -> str:
     """Convert the briefing to a warm-toned HTML card."""
@@ -953,12 +978,13 @@ def generate_html(md_content: str, month_day: str, weather: dict, trending: list
         for d in city_data["days"]:
             t_min = d['temp_min'] if isinstance(d['temp_min'], str) else int(round(d['temp_min']))
             t_max = d['temp_max'] if isinstance(d['temp_max'], str) else int(round(d['temp_max']))
-            t_range = f"{t_min}°C ~ {t_max}°C"
+            t_range = f"{_html_text(t_min)}°C ~ {_html_text(t_max)}°C"
             city_lines.append(
-                f'<span class="weather-item"><strong>{d["label"]}</strong> {d["weather"]} {t_range}</span>'
+                f'<span class="weather-item"><strong>{_html_text(d["label"])}</strong> '
+                f'{_html_text(d["weather"])} {t_range}</span>'
             )
         weather_blocks.append(
-            f'<div class="city-label">🌤 {city_data["name"]}天气</div>'
+            f'<div class="city-label">🌤 {_html_text(city_data["name"])}天气</div>'
             f'<div>{" · ".join(city_lines)}</div>'
         )
     weather_html = "\n        ".join(weather_blocks)
@@ -967,53 +993,65 @@ def generate_html(md_content: str, month_day: str, weather: dict, trending: list
     trending_html = ""
     for i, repo in enumerate(trending, 1):
         num = f"{i:02d}"
-        desc = repo.get('description_cn') or repo.get('description') or "(暂无描述)"
-        lang_tag = f' <span class="lang-tag">{repo["language"]}</span>' if repo["language"] else ""
-        stars_tag = f' <span class="stars-tag">{repo["stars_today"]}</span>' if repo["stars_today"] else ""
+        desc = _html_text(repo.get('description_cn') or repo.get('description') or "(暂无描述)")
+        language = _html_text(repo.get("language", ""))
+        stars = _html_text(repo.get("stars_today", ""))
+        lang_tag = f' <span class="lang-tag">{language}</span>' if language else ""
+        stars_tag = f' <span class="stars-tag">{stars}</span>' if stars else ""
+        url = _safe_http_url(repo.get("url"))
+        link = (
+            f'<a class="item-link" href="{_html_text(url)}">{_html_text(url)}</a>'
+            if url else ""
+        )
         trending_html += f"""
         <div class="item">
-            <div class="item-title">{num}. {repo['name']}{lang_tag}{stars_tag}</div>
+            <div class="item-title">{num}. {_html_text(repo.get('name', ''))}{lang_tag}{stars_tag}</div>
             <div class="item-desc">{desc}</div>
-            <a class="item-link" href="{repo['url']}">{repo['url']}</a>
+            {link}
         </div>"""
 
     # Build ProductHunt items
     ph_html = ""
     for i, product in enumerate(producthunt, 1):
         num = f"{i:02d}"
-        desc = product.get('description_cn') or product.get('description') or "(暂无描述)"
-        maker_tag = f' by <span class="maker-tag">{product["maker"]}</span>' if product.get("maker") else ""
+        desc = _html_text(product.get('description_cn') or product.get('description') or "(暂无描述)")
+        maker = _html_text(product.get("maker", ""))
+        maker_tag = f' by <span class="maker-tag">{maker}</span>' if maker else ""
+        url = _safe_http_url(product.get("url"))
+        link = f'<a class="item-link" href="{_html_text(url)}">查看产品 →</a>' if url else ""
         ph_html += f"""
         <div class="item">
-            <div class="item-title">{num}. {product['name']}{maker_tag}</div>
+            <div class="item-title">{num}. {_html_text(product.get('name', ''))}{maker_tag}</div>
             <div class="item-desc">{desc}</div>
-            {f'<a class="item-link" href="{product["url"]}">查看产品 →</a>' if product.get('url') else ''}
+            {link}
         </div>"""
 
     # Build AI news items
     ai_html = ""
     for i, item in enumerate(ai_news, 1):
         num = f"{i:02d}"
-        desc = item.get('description', '')
-        url = item.get('url', '')
+        desc = _html_text(item.get('description', ''))
+        url = _safe_http_url(item.get('url'))
+        link = f'<a class="item-link" href="{_html_text(url)}">阅读原文 →</a>' if url else ""
         ai_html += f"""
         <div class="item">
-            <div class="item-title">{num}. {item['title']}</div>
+            <div class="item-title">{num}. {_html_text(item.get('title', ''))}</div>
             <div class="item-desc">{desc}</div>
-            {f'<a class="item-link" href="{url}">阅读原文 →</a>' if url else ''}
+            {link}
         </div>"""
 
     # Build domestic news items
     dom_html = ""
     for i, item in enumerate(domestic_news, 1):
         num = f"{i:02d}"
-        desc = item.get('description', '')
-        url = item.get('url', '')
+        desc = _html_text(item.get('description', ''))
+        url = _safe_http_url(item.get('url'))
+        link = f'<a class="item-link" href="{_html_text(url)}">阅读原文 →</a>' if url else ""
         dom_html += f"""
         <div class="item">
-            <div class="item-title">{num}. {item['title']}</div>
+            <div class="item-title">{num}. {_html_text(item.get('title', ''))}</div>
             <div class="item-desc">{desc}</div>
-            {f'<a class="item-link" href="{url}">阅读原文 →</a>' if url else ''}
+            {link}
         </div>"""
 
     html = f"""<!DOCTYPE html>
@@ -1172,7 +1210,7 @@ body {{
 </head>
 <body>
 <div class="card">
-    <div class="main-title">{month_day}热点速览精选</div>
+    <div class="main-title">{_html_text(month_day)}热点速览精选</div>
     <div class="subtitle">{datetime.now(_tz).strftime('%Y年%m月%d日')} · 每日新闻简报</div>
     <div class="accent-bar"></div>
 
@@ -1207,8 +1245,8 @@ body {{
 
     <!-- Quote -->
     <div class="quote-section">
-        <div class="quote-text">「{quote[0]}」</div>
-        <div class="quote-author">—— {quote[1]}</div>
+        <div class="quote-text">「{_html_text(quote[0])}」</div>
+        <div class="quote-author">—— {_html_text(quote[1])}</div>
     </div>
 
     <div class="footer">Daily News Briefing · Auto-generated</div>
@@ -1248,8 +1286,7 @@ def update_summary(md_content: str, filename_date: str):
     # Rebuild index
     index_lines = ["# 每日新闻简报 · 汇总\n", "\n## 目录\n"]
     for d in dates:
-        anchor = d.replace("-", "")
-        index_lines.append(f"- [{d}](#{anchor})\n")
+        index_lines.append(f"- [{d}](#{d})\n")
 
     index = "".join(index_lines)
     full = index + "\n---\n\n" + new_entry
@@ -1434,13 +1471,13 @@ def main():
     print("\n🎨  Rendering card image...")
     try:
         pil_render_card(weather, trending, producthunt, ai_news, domestic_news, quote, img_path)
-        img_ok = img_path.exists()
-        if img_ok:
-            print(f"   ✅ Image saved: {img_path}")
-        else:
-            print(f"   ⚠️  Image file not found after render")
     except Exception as e:
         print(f"   ❌ Render error: {e}")
+        raise
+    if not img_path.is_file() or img_path.stat().st_size == 0:
+        raise RuntimeError(f"Image render did not create a readable file: {img_path}")
+    img_ok = True
+    print(f"   ✅ Image saved: {img_path}")
 
     # 8. Update Summary
     print("\n📋  Updating summary...")
